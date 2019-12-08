@@ -1,0 +1,66 @@
+#include <iostream>
+#include "Generator.h"
+
+void helpmenu() {
+    std::string help =
+            R"(
+
+### CBRUTE 0.1 ###
+
+    Generate combinations/permutations with cbrute!
+
+USAGE:
+    cbrute [arguments]
+
+OPTIONS:
+    -h                      This help menu
+    -log                    Print results to the console
+
+ARGUMENTS:
+    -l <value>              Length of the combination
+    -c <values>             Character-set
+    -f <path>               Path for output file with the combinations
+    -perm                   No repetitions
+                            cbrute will generate every possible permutation of the given characters
+                            A custom -l argument will be ignored
+    -ascii                  Full (printable) ASCII character-set
+    -alphabetic <value>     Add full latin alphabet to character-set
+                            l: lowercase letters
+                            u: uppercase letters
+    -alphabetic             Add full latin alphabet to character-set with both uppercase and lowercase
+                            characters
+    -digit                  Add digits from 0-9 to the character-set
+    -special                Add special characters to the character-set
+
+    )";
+    std::cout << help << std::endl;
+}
+
+int main(int argc, char *argv[]) {
+
+    if (argc < 2) {
+        std::cerr << "Not enough arguments. See -h for help." << std::endl;
+        return 1;
+    }
+
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "-h") {
+            helpmenu();
+            return 0;
+        }
+    }
+
+    auto generator = Generator(argc, argv);
+    try {
+        generator.start();
+        if (generator.isLog()) {
+            for (const auto &s : generator.combinations) std::cout << s << "\n";
+        }
+        std::cout << generator.combinations.size() << " combinations generated." << std::endl;
+    } catch (...) {
+        std::cerr << "Looks like something went wrong. See -h for help." << std::endl;
+        return 1;
+    }
+
+    return 0;
+}

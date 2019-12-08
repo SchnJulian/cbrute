@@ -1,0 +1,28 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/Julian/Documents/Workspace/CLion Workspace/cbrute/Generator.cpp
+cmath
+-
+iostream
+-
+map
+-
+Generator.h
+/Users/Julian/Documents/Workspace/CLion Workspace/cbrute/Generator.h
+
+/Users/Julian/Documents/Workspace/CLion Workspace/cbrute/Generator.h
+cstdlib
+-
+string
+-
+vector
+-
+fstream
+-
+
