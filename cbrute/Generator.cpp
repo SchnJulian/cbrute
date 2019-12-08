@@ -52,6 +52,7 @@ void Generator::start() {
     } else {
         total_n = static_cast<unsigned long>(std::pow(elementCount, length));
     }
+
     if (memoryApproximation(total_n)) {
         if (perm) {
             getPermutations([this](auto &perm) {
@@ -95,7 +96,8 @@ bool Generator::memoryApproximation(unsigned long total_n) {
     }
     std::cout << "This operation will produce an array of strings that will allocate " << approxMemory / UD.second
               << UD.first << "\n" << "Are you sure you want to continue? [y/n] : ";
-    char input;
+    char input = 'y';
+
     std::cin >> input;
     return (std::tolower(input) == 'y');
 }

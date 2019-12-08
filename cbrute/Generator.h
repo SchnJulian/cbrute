@@ -35,7 +35,7 @@ private:
 
     size_t length = 0;
     size_t elementCount = 0;
-    size_t approxMemory = 0;
+    long double approxMemory = 0;
     bool perm = false;
     std::vector<char> charPool;
     std::ofstream outStream;
