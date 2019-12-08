@@ -1,4 +1,4 @@
-# Install script for directory: /Users/Julian/Documents/Workspace/CLion Workspace/cbrute
+# Install script for directory: /Users/Julian/Documents/GitHub/cbrute/cbrute
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -40,5 +40,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/Users/Julian/Documents/Workspace/CLion Workspace/cbrute/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/Users/Julian/Documents/GitHub/cbrute/cbrute/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

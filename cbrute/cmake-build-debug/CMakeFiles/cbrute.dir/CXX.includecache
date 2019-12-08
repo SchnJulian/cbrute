@@ -6,7 +6,7 @@
 
 #IncludeRegexTransform: 
 
-/Users/Julian/Documents/Workspace/CLion Workspace/cbrute/Generator.cpp
+/Users/Julian/Documents/GitHub/cbrute/cbrute/Generator.cpp
 cmath
 -
 iostream
@@ -14,9 +14,9 @@ iostream
 map
 -
 Generator.h
-/Users/Julian/Documents/Workspace/CLion Workspace/cbrute/Generator.h
+/Users/Julian/Documents/GitHub/cbrute/cbrute/Generator.h
 
-/Users/Julian/Documents/Workspace/CLion Workspace/cbrute/Generator.h
+/Users/Julian/Documents/GitHub/cbrute/cbrute/Generator.h
 cstdlib
 -
 string
@@ -25,4 +25,10 @@ vector
 -
 fstream
 -
+
+/Users/Julian/Documents/GitHub/cbrute/cbrute/main.cpp
+iostream
+-
+Generator.h
+/Users/Julian/Documents/GitHub/cbrute/cbrute/Generator.h
 
