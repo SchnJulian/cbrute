@@ -11,33 +11,6 @@
 #include <vector>
 #include <fstream>
 
-/**
-USAGE:
-cbrute [arguments]
-
-OPTIONS:
--h				This help menu
--log				Print results to the console
-
-ARGUMENTS:
--l <value>			Length of the combination
--c <values>		Character-set
--f <path>			Path for output file with the combinations
--perm			No repetitions. cbrute will generate every possible permutation of the given 					characters
-A custom -l argument will be ignored
--ascii				Full (printable) ASCII character-set
--alphabetic <value>	Add full latin alphabet to character-set
-        l	: lowercase letters
-u 	: uppercase letters
--alphabetic		Add full latin alphabet to character-set with both uppercase and lowercase
-        characters
--digit				Add digits from 0-9 to the character-set
--special			Add special characters to the character-set
-*/
-
-
-
-
 class Generator {
 
 public:
