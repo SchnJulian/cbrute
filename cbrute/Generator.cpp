@@ -131,6 +131,7 @@ bool Generator::parseArguments(int argc, char **args) {
     auto digit = std::make_pair("-digit", "");
     auto special = std::make_pair("-special", "");
     auto ascii = std::make_pair("-ascii", "");
+    auto exclude = std::make_pair("-x", "");
 
     map.insert(length);
     map.insert(characters);
@@ -141,6 +142,7 @@ bool Generator::parseArguments(int argc, char **args) {
     map.insert(digit);
     map.insert(special);
     map.insert(ascii);
+    map.insert(exclude);
 
     for (int i = 1; i < argc - 1; ++i) {
         if (map.find(args[i]) != std::end(map)) {
@@ -151,44 +153,53 @@ bool Generator::parseArguments(int argc, char **args) {
     if (map.find(args[argc - 1]) != std::end(map)) map.find(args[argc - 1])->second = "1";
 
     try {
-        this->perm = !(map.at("-perm").empty());
+        this->perm = !(map.at(perm.first).empty());
         if (!this->perm) {
             this->length = std::stoul(map.at("-l"));
         }
-        this->path = map.at("-f");
-        this->log = !(map.at("-log").empty());
+        this->path = map.at(filePath.first);
+        this->log = !(map.at(log.first).empty());
     } catch (std::invalid_argument &e) {
         return false;
     }
     // Check if full ascii set was activated
-    if (!(map.at("-ascii").empty())) {
+    if (!(map.at(ascii.first).empty())) {
         std::copy(this->ascii.begin(), this->ascii.end(), std::back_inserter(this->charPool));
     } else {
         // Initialize alphabetic character set
-        if (map.at("-alphabetic") == "u") {
+        if (map.at(alphabetic.first) == "u") {
             std::copy(this->alphaU.begin(), this->alphaU.end(), std::back_inserter(this->charPool));
-        } else if (map.at("-alphabetic") == "l") {
+        } else if (map.at(alphabetic.first) == "l") {
             std::copy(this->alphaL.begin(), this->alphaL.end(), std::back_inserter(this->charPool));
-        } else if (!(map.at("-alphabetic").empty())) {
+        } else if (!(map.at(alphabetic.first).empty())) {
             std::copy(this->alphaU.begin(), this->alphaU.end(), std::back_inserter(this->charPool));
             std::copy(this->alphaL.begin(), this->alphaL.end(), std::back_inserter(this->charPool));
         }
 
         // Initialize numeric character set
-        if (!(map.at("-digit").empty()))
+        if (!(map.at(digit.first).empty()))
             std::copy(this->digit.begin(), this->digit.end(), std::back_inserter(this->charPool));
 
         // Initialize special character set
-        if (!(map.at("-special").empty()))
+        if (!(map.at(special.first).empty()))
             std::copy(this->special.begin(), this->special.end(), std::back_inserter(this->charPool));
 
         // Initialize character set
-        std::string temp = map.at("-c");
+        std::string temp = map.at(characters.first);
         std::copy(temp.begin(), temp.end(), std::back_inserter(this->charPool));
+
+        std::vector<char> tempX(std::begin(map.at(exclude.first)), std::end(map.at(exclude.first)));
+        std::sort(std::begin(tempX), std::end(tempX));
+        std::sort(std::begin(this->charPool), std::end(this->charPool));
+        if (!(map.at(exclude.first).empty())) {
+            this->charPool.erase(std::remove_if(std::begin(this->charPool), std::end(this->charPool), [&tempX](char c) {
+                return std::binary_search(std::begin(tempX), std::end(tempX), c);
+            }), std::end(this->charPool));
+
+        }
     }
 
     // Remove duplicates
-    std::sort(std::begin(this->charPool), std::end(this->charPool));
     this->charPool.erase(std::unique(std::begin(this->charPool), std::end(this->charPool)), std::end(this->charPool));
     this->elementCount = charPool.size();
 
