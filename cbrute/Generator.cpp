@@ -14,14 +14,13 @@ void Generator::getCombinations(Callable func) {
     // Fill with dummy elements
     std::string comb(length, ' ');
     auto total_n = static_cast<unsigned long>(std::pow(elementCount, length));
-    combinations.reserve(total_n);
     for (auto i = 0UL; i < total_n; ++i) {
         auto n = i;
         for (size_t j = 0; j < length; ++j) {
             comb[comb.size() - j - 1] = charPool[n % elementCount];
             n /= elementCount;
         }
-        func(comb);
+        for (auto f : func) (this->*f)(comb);
     }
 }
 
@@ -30,54 +29,58 @@ void Generator::getPermutations(Callable func) {
     std::string perm(std::begin(charPool), std::end(charPool));
     std::sort(std::begin(perm), std::end(perm));
     do {
-        func(perm);
+        for (auto f : func) (this->*f)(perm);
     } while (std::next_permutation(std::begin(perm), std::end(perm)));
 }
 
-bool Generator::initFileSystem() {
-    outStream.open(path);
-    return outStream.good();
+void Generator::console(std::string &comb) {
+    std::cout << comb << '\n';
+}
+
+void Generator::file(std::string &comb) {
+    fileStream << comb << '\n';
+}
+
+
+bool Generator::initTasks() {
+    if (!appendT.empty()) tasks.push_back(&Generator::append);
+    if (!prependT.empty()) tasks.push_back(&Generator::prepend);
+    if (!path.empty()) {
+        fileStream.open(path);
+        tasks.push_back(&Generator::file);
+        return fileStream.good();
+    }
+    if (log) {
+        tasks.push_back(&Generator::console);
+    }
+    return true;
 }
 
 size_t factorial(size_t n) { return (n == 1L || n == 0L) ? 1L : factorial(n - 1L) * n; }
 
 void Generator::start() {
-    if (!ready) {
-        throw std::string("generatorNotReadyException");
-    }
-
-    unsigned long total_n = 0;
     if (perm) {
-        total_n = factorial(elementCount);
+        getPermutations(tasks);
     } else {
-        total_n = static_cast<unsigned long>(std::pow(elementCount, length));
-    }
-
-    if (memoryApproximation(total_n)) {
-        if (perm) {
-            getPermutations([this](auto &perm) {
-                this->combinations.emplace_back(perm);
-            });
-        } else {
-            getCombinations([this](auto &comb) {
-                this->combinations.emplace_back(comb);
-            });
-        }
-        if (!path.empty()) {
-            for (auto &c : combinations) {
-                outStream << c << "\n";
-            }
-        }
+        getCombinations(tasks);
     }
 }
 
-bool Generator::memoryApproximation(unsigned long total_n) {
-    if (perm) {
-        approxMemory = sizeof(char) * elementCount * total_n;
-    } else {
-        approxMemory = sizeof(char) * length * total_n;
-    }
+void Generator::memoryApproximation() {
 
+    if (perm) {
+        totalN = factorial(elementCount);
+    } else {
+        totalN = static_cast<unsigned long>(std::pow(elementCount, length));
+    }
+    if (perm) {
+        approxMemory = sizeof(char) * elementCount * totalN;
+    } else {
+        approxMemory = sizeof(char) * length * totalN;
+    }
+}
+
+bool Generator::confirmMemory() {
     auto unit = "B";
     auto divisor = 1L;
     auto UD = std::make_pair(unit, divisor);
@@ -99,25 +102,26 @@ bool Generator::memoryApproximation(unsigned long total_n) {
     char input = 'y';
 
     std::cin >> input;
-    return (std::tolower(input) == 'y');
+    return (tolower(input) == 'y');
 }
 
 Generator::~Generator() {
-    outStream.close();
+    fileStream.close();
 }
 
 Generator::Generator(int argc, char **args) {
     bool ready = false;
     if (parseArguments(argc, args)) {
         if (checkArguments()) {
-            if (path.empty()) {
-                ready = true;
-            } else {
-                ready = initFileSystem();
-            }
+            ready = initTasks();
         }
     }
+    // Approximate memory
+    memoryApproximation();
     this->ready = ready;
+    if (!ready) {
+        throw std::string("generatorNotReadyException");
+    }
 }
 
 bool Generator::parseArguments(int argc, char **args) {
@@ -132,6 +136,8 @@ bool Generator::parseArguments(int argc, char **args) {
     auto special = std::make_pair("-special", "");
     auto ascii = std::make_pair("-ascii", "");
     auto exclude = std::make_pair("-x", "");
+    auto prepend = std::make_pair("-prepend", "");
+    auto append = std::make_pair("-append", "");
 
     map.insert(length);
     map.insert(characters);
@@ -143,7 +149,10 @@ bool Generator::parseArguments(int argc, char **args) {
     map.insert(special);
     map.insert(ascii);
     map.insert(exclude);
+    map.insert(prepend);
+    map.insert(append);
 
+    // Iterate through arg string
     for (int i = 1; i < argc - 1; ++i) {
         if (map.find(args[i]) != std::end(map)) {
             map.find(args[i])->second = args[i + 1];
@@ -155,38 +164,48 @@ bool Generator::parseArguments(int argc, char **args) {
     try {
         this->perm = !(map.at(perm.first).empty());
         if (!this->perm) {
-            this->length = std::stoul(map.at("-l"));
+            this->length = std::stoul(map.at(length.first));
         }
         this->path = map.at(filePath.first);
         this->log = !(map.at(log.first).empty());
     } catch (std::invalid_argument &e) {
         return false;
     }
+
+    // String to appendT to
+    if (!(map.at(append.first).empty()))
+        std::copy(std::begin(map.at(append.first)), std::end(map.at(append.first)), std::back_inserter(this->appendT));
+
+    // String to prepend before
+    if (!(map.at(prepend.first).empty()))
+        std::copy(std::begin(map.at((prepend.first))), std::end(map.at((prepend.first))),
+                  std::back_inserter(this->prependT));
+
     // Check if full ascii set was activated
     if (!(map.at(ascii.first).empty())) {
-        std::copy(this->ascii.begin(), this->ascii.end(), std::back_inserter(this->charPool));
+        std::copy(std::begin(this->ascii), std::end(this->ascii), std::back_inserter(this->charPool));
     } else {
         // Initialize alphabetic character set
         if (map.at(alphabetic.first) == "u") {
-            std::copy(this->alphaU.begin(), this->alphaU.end(), std::back_inserter(this->charPool));
+            std::copy(std::begin(this->alphaU), std::end(this->alphaU), std::back_inserter(this->charPool));
         } else if (map.at(alphabetic.first) == "l") {
-            std::copy(this->alphaL.begin(), this->alphaL.end(), std::back_inserter(this->charPool));
+            std::copy(std::begin(this->alphaL), std::end(this->alphaL), std::back_inserter(this->charPool));
         } else if (!(map.at(alphabetic.first).empty())) {
-            std::copy(this->alphaU.begin(), this->alphaU.end(), std::back_inserter(this->charPool));
-            std::copy(this->alphaL.begin(), this->alphaL.end(), std::back_inserter(this->charPool));
+            std::copy(std::begin(this->alphaU), std::end(this->alphaU), std::back_inserter(this->charPool));
+            std::copy(std::begin(this->alphaL), std::end(this->alphaL), std::back_inserter(this->charPool));
         }
 
         // Initialize numeric character set
         if (!(map.at(digit.first).empty()))
-            std::copy(this->digit.begin(), this->digit.end(), std::back_inserter(this->charPool));
+            std::copy(std::begin(this->digit), std::end(this->digit), std::back_inserter(this->charPool));
 
         // Initialize special character set
         if (!(map.at(special.first).empty()))
-            std::copy(this->special.begin(), this->special.end(), std::back_inserter(this->charPool));
+            std::copy(std::begin(this->special), std::end(this->special), std::back_inserter(this->charPool));
 
         // Initialize character set
         std::string temp = map.at(characters.first);
-        std::copy(temp.begin(), temp.end(), std::back_inserter(this->charPool));
+        std::copy(std::begin(temp), std::end(temp), std::back_inserter(this->charPool));
 
         std::vector<char> tempX(std::begin(map.at(exclude.first)), std::end(map.at(exclude.first)));
         std::sort(std::begin(tempX), std::end(tempX));
@@ -217,5 +236,18 @@ bool Generator::checkArguments() {
 
 bool Generator::isReady() const {
     return this->ready;
+}
+
+unsigned long Generator::getTotalN() const {
+    return totalN;
+}
+
+void Generator::append(std::string &comb) {
+    std::string buf = appendT;
+    comb = buf.append(comb);
+}
+
+void Generator::prepend(std::string &comb) {
+    comb.append(prependT);
 }
 
