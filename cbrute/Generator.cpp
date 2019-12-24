@@ -2,85 +2,142 @@
 // Created by Julian Schnabel on 04.12.19.
 //
 
-
-
-#include <cmath>
-#include <iostream>
-#include <map>
 #include "Generator.h"
 
-template <typename Callable>
-void Generator::getCombinations(Callable func) {
-    // Fill with dummy elements
-    std::string comb(length, ' ');
-    auto total_n = static_cast<unsigned long>(std::pow(elementCount, length));
-    for (auto i = 0UL; i < total_n; ++i) {
-        auto n = i;
-        for (size_t j = 0; j < length; ++j) {
-            comb[comb.size() - j - 1] = charPool[n % elementCount];
-            n /= elementCount;
+unsigned long long factorial(size_t n) {
+    return (n == 1L || n == 0L) ? 1L : factorial(n - 1L) * n;
+}
+
+Generator::~Generator() {
+    fileStream.close();
+}
+
+Generator::Generator(int argc, char **args) {
+    if (parseArguments(argc, args)) {
+        if (checkArguments()) {
+            initTasks();
+            totalN = (perm) ? factorial(elementCount)
+                            : static_cast<unsigned long>(std::pow(elementCount,
+                                                                  length));
         }
-        for (auto f : func) (this->*f)(comb);
     }
 }
 
-template <typename Callable>
-void Generator::getPermutations(Callable func) {
-    std::string perm(std::begin(charPool), std::end(charPool));
+void Generator::getCombinations(unsigned long start, unsigned long end) {
+    // Fill with dummy elements
+    std::string comb(length, ' ');
+    std::string temp(length, ' ');
+
+    for (auto i = start; i < end; ++i) {
+        auto n = i;
+        for (size_t j = 0; j < length; ++j) {
+            comb[comb.size() - j - 1] = characterSet[n % elementCount];
+            n /= elementCount;
+        }
+        temp = comb;
+        for (auto f : tasks) (this->*f)(temp);
+    }
+}
+
+void Generator::getPermutations() {
+    std::string temp(length, ' ');
+    std::string perm(std::begin(characterSet), std::end(characterSet));
     std::sort(std::begin(perm), std::end(perm));
     do {
-        for (auto f : func) (this->*f)(perm);
+        temp = perm;
+        for (auto f : tasks) (this->*f)(temp);
     } while (std::next_permutation(std::begin(perm), std::end(perm)));
 }
-
-void Generator::console(std::string &comb) {
-    std::cout << comb << '\n';
-}
-
-void Generator::file(std::string &comb) {
-    fileStream << comb << '\n';
-}
-
 
 bool Generator::initTasks() {
     if (!appendT.empty()) tasks.push_back(&Generator::append);
     if (!prependT.empty()) tasks.push_back(&Generator::prepend);
-    if (!path.empty()) {
-        fileStream.open(path);
-        tasks.push_back(&Generator::file);
-        return fileStream.good();
-    }
-    if (log) {
-        tasks.push_back(&Generator::console);
-    }
     return true;
 }
 
-size_t factorial(size_t n) { return (n == 1L || n == 0L) ? 1L : factorial(n - 1L) * n; }
+bool Generator::initFileStream() {
+    if (!path.empty()) {
+        fileStream.open(path);
+        tasks.push_back(&Generator::addToQueue);
+    }
+    return fileStream.good();
+}
+
+void Generator::append(std::string &str) {
+    str.append(appendT);
+}
+
+void Generator::prepend(std::string &str) {
+    str.insert(0, prependT);
+}
+
+void Generator::console() {
+    unsigned long todo = totalN;
+    while (todo > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::queue<std::string> temp;
+        { // Lock only taken for this section
+            std::lock_guard<std::mutex> lock(m);
+            std::swap(temp, printQueue);
+        }
+        todo -= temp.size();
+        while (!temp.empty()) {
+            std::cout << temp.front() << '\n';
+            temp.pop();
+        }
+    }
+}
+
+void Generator::print() {
+    unsigned long todo = totalN;
+    while (todo > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::queue<std::string> temp;
+        { // Lock only taken for this section
+            std::lock_guard<std::mutex> lock(m);
+            std::swap(temp, printQueue);
+        }
+        todo -= temp.size();
+        while (!temp.empty()) {
+            fileStream << temp.front() << '\n';
+            temp.pop();
+        }
+    }
+}
 
 void Generator::start() {
     if (perm) {
-        getPermutations(tasks);
+        getPermutations();
     } else {
-        getCombinations(tasks);
+        std::thread first(&Generator::getCombinations, this, 0, totalN);
+        first.join();
+        if (fileMode) {
+            std::thread second(&Generator::print, this);
+            second.join();
+        }
+        if (log) {
+            std::thread third(&Generator::console, this);
+            third.join();
+        }
     }
 }
 
 void Generator::memoryApproximation() {
+    if (perm) {
+        approxMemory = sizeof(char) *
+                       (elementCount + appendT.length() + prependT.length() +
+                        1) * totalN;
+    } else {
+        approxMemory = sizeof(char) *
+                       (length + appendT.length() + prependT.length() + 1) *
+                       totalN;
+    }
 
-    if (perm) {
-        totalN = factorial(elementCount);
-    } else {
-        totalN = static_cast<unsigned long>(std::pow(elementCount, length));
-    }
-    if (perm) {
-        approxMemory = sizeof(char) * elementCount * totalN;
-    } else {
-        approxMemory = sizeof(char) * length * totalN;
-    }
 }
 
 bool Generator::confirmMemory() {
+    // Approximate memory
+    memoryApproximation();
     auto unit = "B";
     auto divisor = 1L;
     auto UD = std::make_pair(unit, divisor);
@@ -97,35 +154,22 @@ bool Generator::confirmMemory() {
         UD.first = "TB";
         UD.second = 1000000000000;
     }
-    std::cout << "This operation will produce an array of strings that will allocate " << approxMemory / UD.second
-              << UD.first << "\n" << "Are you sure you want to continue? [y/n] : ";
-    char input = 'y';
+    std::cout
+            << "CBRUTE will generate a "
+            << approxMemory / UD.second
+            << UD.first << " text file" << "\n"
+            << "Are you sure you want to continue? [y/n] : ";
 
+    char input;
     std::cin >> input;
-    return (tolower(input) == 'y');
-}
-
-Generator::~Generator() {
-    fileStream.close();
-}
-
-Generator::Generator(int argc, char **args) {
-    bool ready = false;
-    if (parseArguments(argc, args)) {
-        if (checkArguments()) {
-            ready = initTasks();
-        }
+    if (tolower(input) == 'y') {
+        return initFileStream();
     }
-    // Approximate memory
-    memoryApproximation();
-    this->ready = ready;
-    if (!ready) {
-        throw std::string("generatorNotReadyException");
-    }
+    return false;
 }
 
 bool Generator::parseArguments(int argc, char **args) {
-    std::map<std::string, std::string> map;
+    std::map<std::string, std::string> argumentMap;
     auto length = std::make_pair("-l", "");
     auto characters = std::make_pair("-c", "");
     auto filePath = std::make_pair("-f", "");
@@ -139,94 +183,117 @@ bool Generator::parseArguments(int argc, char **args) {
     auto prepend = std::make_pair("-prepend", "");
     auto append = std::make_pair("-append", "");
 
-    map.insert(length);
-    map.insert(characters);
-    map.insert(filePath);
-    map.insert(perm);
-    map.insert(log);
-    map.insert(alphabetic);
-    map.insert(digit);
-    map.insert(special);
-    map.insert(ascii);
-    map.insert(exclude);
-    map.insert(prepend);
-    map.insert(append);
+    argumentMap.insert(length);
+    argumentMap.insert(characters);
+    argumentMap.insert(filePath);
+    argumentMap.insert(perm);
+    argumentMap.insert(log);
+    argumentMap.insert(alphabetic);
+    argumentMap.insert(digit);
+    argumentMap.insert(special);
+    argumentMap.insert(ascii);
+    argumentMap.insert(exclude);
+    argumentMap.insert(prepend);
+    argumentMap.insert(append);
 
     // Iterate through arg string
     for (int i = 1; i < argc - 1; ++i) {
-        if (map.find(args[i]) != std::end(map)) {
-            map.find(args[i])->second = args[i + 1];
+        if (argumentMap.find(args[i]) != std::end(argumentMap)) {
+            argumentMap.find(args[i])->second = args[i + 1];
         }
     }
     // Check last argument
-    if (map.find(args[argc - 1]) != std::end(map)) map.find(args[argc - 1])->second = "1";
+    if (argumentMap.find(args[argc - 1]) != std::end(argumentMap))
+        argumentMap.find(args[argc - 1])->second = "1";
 
     try {
-        this->perm = !(map.at(perm.first).empty());
+        this->perm = !(argumentMap.at(perm.first).empty());
         if (!this->perm) {
-            this->length = std::stoul(map.at(length.first));
+            this->length = std::stoul(argumentMap.at(length.first));
         }
-        this->path = map.at(filePath.first);
-        this->log = !(map.at(log.first).empty());
+        this->path = argumentMap.at(filePath.first);
+        if (!path.empty()) {
+            fileMode = true;
+            if (path.find(defaultFileExtension) == std::string::npos) {
+                // Add missing file extension
+                path.append(defaultFileExtension);
+            }
+        }
+        this->log = !(argumentMap.at(log.first).empty());
     } catch (std::invalid_argument &e) {
         return false;
     }
 
     // String to appendT to
-    if (!(map.at(append.first).empty()))
-        std::copy(std::begin(map.at(append.first)), std::end(map.at(append.first)), std::back_inserter(this->appendT));
+    if (!(argumentMap.at(append.first).empty()))
+        std::copy(std::begin(argumentMap.at(append.first)),
+                  std::end(argumentMap.at(append.first)),
+                  std::back_inserter(this->appendT));
 
     // String to prepend before
-    if (!(map.at(prepend.first).empty()))
-        std::copy(std::begin(map.at((prepend.first))), std::end(map.at((prepend.first))),
+    if (!(argumentMap.at(prepend.first).empty()))
+        std::copy(std::begin(argumentMap.at((prepend.first))),
+                  std::end(argumentMap.at((prepend.first))),
                   std::back_inserter(this->prependT));
 
     // Check if full ascii set was activated
-    if (!(map.at(ascii.first).empty())) {
-        std::copy(std::begin(this->ascii), std::end(this->ascii), std::back_inserter(this->charPool));
+    if (!(argumentMap.at(ascii.first).empty())) {
+        std::copy(std::begin(this->ascii), std::end(this->ascii),
+                  std::back_inserter(this->characterSet));
     } else {
         // Initialize alphabetic character set
-        if (map.at(alphabetic.first) == "u") {
-            std::copy(std::begin(this->alphaU), std::end(this->alphaU), std::back_inserter(this->charPool));
-        } else if (map.at(alphabetic.first) == "l") {
-            std::copy(std::begin(this->alphaL), std::end(this->alphaL), std::back_inserter(this->charPool));
-        } else if (!(map.at(alphabetic.first).empty())) {
-            std::copy(std::begin(this->alphaU), std::end(this->alphaU), std::back_inserter(this->charPool));
-            std::copy(std::begin(this->alphaL), std::end(this->alphaL), std::back_inserter(this->charPool));
+        if (argumentMap.at(alphabetic.first) == "u") {
+            std::copy(std::begin(this->alphaU), std::end(this->alphaU),
+                      std::back_inserter(this->characterSet));
+        } else if (argumentMap.at(alphabetic.first) == "l") {
+            std::copy(std::begin(this->alphaL), std::end(this->alphaL),
+                      std::back_inserter(this->characterSet));
+        } else if (!(argumentMap.at(alphabetic.first).empty())) {
+            std::copy(std::begin(this->alphaU), std::end(this->alphaU),
+                      std::back_inserter(this->characterSet));
+            std::copy(std::begin(this->alphaL), std::end(this->alphaL),
+                      std::back_inserter(this->characterSet));
         }
 
         // Initialize numeric character set
-        if (!(map.at(digit.first).empty()))
-            std::copy(std::begin(this->digit), std::end(this->digit), std::back_inserter(this->charPool));
+        if (!(argumentMap.at(digit.first).empty()))
+            std::copy(std::begin(this->digit), std::end(this->digit),
+                      std::back_inserter(this->characterSet));
 
         // Initialize special character set
-        if (!(map.at(special.first).empty()))
-            std::copy(std::begin(this->special), std::end(this->special), std::back_inserter(this->charPool));
+        if (!(argumentMap.at(special.first).empty()))
+            std::copy(std::begin(this->special), std::end(this->special),
+                      std::back_inserter(this->characterSet));
 
         // Initialize character set
-        std::string temp = map.at(characters.first);
-        std::copy(std::begin(temp), std::end(temp), std::back_inserter(this->charPool));
+        std::string temp = argumentMap.at(characters.first);
+        std::copy(std::begin(temp), std::end(temp),
+                  std::back_inserter(this->characterSet));
 
-        std::vector<char> tempX(std::begin(map.at(exclude.first)), std::end(map.at(exclude.first)));
+        std::vector<char> tempX(std::begin(argumentMap.at(exclude.first)),
+                                std::end(argumentMap.at(exclude.first)));
         std::sort(std::begin(tempX), std::end(tempX));
-        std::sort(std::begin(this->charPool), std::end(this->charPool));
-        if (!(map.at(exclude.first).empty())) {
-            this->charPool.erase(std::remove_if(std::begin(this->charPool), std::end(this->charPool), [&tempX](char c) {
-                return std::binary_search(std::begin(tempX), std::end(tempX), c);
-            }), std::end(this->charPool));
+        std::sort(std::begin(this->characterSet), std::end(this->characterSet));
+        if (!(argumentMap.at(exclude.first).empty())) {
+            this->characterSet.erase(
+                    std::remove_if(std::begin(this->characterSet),
+                                   std::end(this->characterSet),
+                                   [&tempX](char c) {
+                                       return std::binary_search(
+                                               std::begin(tempX),
+                                               std::end(tempX), c);
+                                   }), std::end(this->characterSet));
 
         }
     }
 
     // Remove duplicates
-    this->charPool.erase(std::unique(std::begin(this->charPool), std::end(this->charPool)), std::end(this->charPool));
-    this->elementCount = charPool.size();
-
+    this->characterSet.erase(
+            std::unique(std::begin(this->characterSet),
+                        std::end(this->characterSet)),
+            std::end(this->characterSet));
+    this->elementCount = characterSet.size();
     return true;
-}
-
-bool Generator::isLog() const {
-    return log;
 }
 
 bool Generator::checkArguments() {
@@ -234,20 +301,17 @@ bool Generator::checkArguments() {
     return length > 1 && elementCount > 1;
 }
 
-bool Generator::isReady() const {
-    return this->ready;
-}
-
 unsigned long Generator::getTotalN() const {
     return totalN;
 }
 
-void Generator::append(std::string &comb) {
-    std::string buf = appendT;
-    comb = buf.append(comb);
+void Generator::addToQueue(std::string &str) {
+    {
+        std::lock_guard<std::mutex> lock(m);
+        printQueue.push(str);
+    }
 }
 
-void Generator::prepend(std::string &comb) {
-    comb.append(prependT);
+bool Generator::isFileMode() const {
+    return fileMode;
 }
-

@@ -33,8 +33,8 @@ ARGUMENTS:
     -digit                  Add digits from 0-9 to the character-set
     -special                Add special characters to the character-set
     -x <values>             Excluded characters
-    -prepend <value>        Put results in front of a word
-    -appendT <value>         Appends results to a word
+    -prepend <value>        Prepend <string>
+    -appendT <value>        Append <string>
     )";
     std::cout << help << std::endl;
 }
@@ -56,18 +56,22 @@ int main(int argc, char *argv[]) {
     auto generator = Generator(argc, argv);
     try {
         // Abort option
-        if (!generator.confirmMemory()) {
-            throw std::string("AbortedByUserException");
+        if (generator.isFileMode()) {
+            if (!generator.confirmMemory()) {
+                throw std::invalid_argument("AbortedByUser");
+            }
         }
         auto start = std::chrono::high_resolution_clock::now();
         generator.start();
         auto stop = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-
-        std::cout << generator.getTotalN() << " combinations generated in " << duration.count() << " ms" << std::endl;
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                stop - start);
+        std::cout << generator.getTotalN() << " combinations generated in "
+                  << duration.count() << " ms" << std::endl;
 
     } catch (const std::exception &exc) {
-        std::cerr << "Looks like something went wrong. See -h for help." << std::endl;
+        std::cerr << "Looks like something went wrong. See -h for help."
+                  << std::endl;
         std::cerr << exc.what() << std::endl;
         return 1;
     }
