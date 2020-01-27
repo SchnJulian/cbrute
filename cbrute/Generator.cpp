@@ -4,7 +4,7 @@
 
 #include "Generator.h"
 
-unsigned long long factorial(size_t n) {
+unsigned long long factorial(unsigned long long n) {
     return (n == 1L || n == 0L) ? 1L : factorial(n - 1L) * n;
 }
 
@@ -16,31 +16,41 @@ Generator::Generator(int argc, char **args) {
     if (parseArguments(argc, args)) {
         if (checkArguments()) {
             initTasks();
-            totalN = (perm) ? factorial(elementCount)
-                            : static_cast<unsigned long>(std::pow(elementCount,
-                                                                  length));
+            calculateTotalN();
         }
+    }
+}
+
+void Generator::calculateN() {
+    if (this->perm) {
+        this->totalN = factorial(this->elementCount);
+    } else {
+        this->totalN = static_cast<unsigned long>(std::pow(this->elementCount, this->length));
     }
 }
 
 void Generator::getCombinations(unsigned long start, unsigned long end) {
-    // Fill with dummy elements
-    std::string comb(length, ' ');
-    std::string temp(length, ' ');
+    // TODO: For loop for different length-combinations
+    for (size_t length = lengthMin; length <= lengthMax; length++) {
+        // Fill with dummy elements
+        std::string comb(length, ' ');
+        std::string temp(length, ' ');
 
-    for (auto i = start; i < end; ++i) {
-        auto n = i;
-        for (size_t j = 0; j < length; ++j) {
-            comb[comb.size() - j - 1] = characterSet[n % elementCount];
-            n /= elementCount;
+        for (auto i = start; i < end; ++i) {
+            auto n = i;
+            for (size_t j = 0; j < length; ++j) {
+                comb[comb.size() - j - 1] = characterSet[n % elementCount];
+                n /= elementCount;
+            }
+            temp = comb;
+            for (auto f : tasks) (this->*f)(temp);
         }
-        temp = comb;
-        for (auto f : tasks) (this->*f)(temp);
     }
+
 }
 
 void Generator::getPermutations() {
-    std::string temp(length, ' ');
+    std::string temp(lengthMin, ' ');
     std::string perm(std::begin(characterSet), std::end(characterSet));
     std::sort(std::begin(perm), std::end(perm));
     do {
@@ -109,10 +119,19 @@ void Generator::start() {
     if (perm) {
         getPermutations();
     } else {
-        std::thread first(&Generator::getCombinations, this, 0, totalN);
-        first.join();
+
+        if (lengthMin - lengthMax == 0) {
+            std::thread first(&Generator::getCombinations, this, 0, totalN);
+            first.join();
+        } else {
+            // FIXME Multithreading for different lengths
+            for (size_t lengthTemp = lengthMin; lengthTemp <= lengthMax; lengthTemp++) {
+                std::thread first(&Generator::getCombinations, this, 0, getN(lengthTemp));
+                first.join();
+            }
+        }
+        std::thread second(&Generator::print, this);
         if (fileMode) {
-            std::thread second(&Generator::print, this);
             second.join();
         }
         if (log) {
@@ -128,11 +147,12 @@ void Generator::memoryApproximation() {
                        (elementCount + appendT.length() + prependT.length() +
                         1) * totalN;
     } else {
-        approxMemory = sizeof(char) *
-                       (length + appendT.length() + prependT.length() + 1) *
-                       totalN;
+        for (size_t lengthTemp = lengthMax; lengthTemp <= lengthMax; lengthTemp++) {
+            approxMemory += sizeof(char) *
+                            (lengthTemp + appendT.length() + prependT.length() + 1) * totalN;
+            // Calculate total count of combinations
+        }
     }
-
 }
 
 bool Generator::confirmMemory() {
@@ -170,7 +190,8 @@ bool Generator::confirmMemory() {
 
 bool Generator::parseArguments(int argc, char **args) {
     std::map<std::string, std::string> argumentMap;
-    auto length = std::make_pair("-l", "");
+    auto lengthMin = std::make_pair("-lmin", "");
+    auto lengthMax = std::make_pair("-lmax", "");
     auto characters = std::make_pair("-c", "");
     auto filePath = std::make_pair("-f", "");
     auto perm = std::make_pair("-perm", "");
@@ -183,7 +204,8 @@ bool Generator::parseArguments(int argc, char **args) {
     auto prepend = std::make_pair("-prepend", "");
     auto append = std::make_pair("-append", "");
 
-    argumentMap.insert(length);
+    argumentMap.insert(lengthMin);
+    argumentMap.insert(lengthMax);
     argumentMap.insert(characters);
     argumentMap.insert(filePath);
     argumentMap.insert(perm);
@@ -209,7 +231,9 @@ bool Generator::parseArguments(int argc, char **args) {
     try {
         this->perm = !(argumentMap.at(perm.first).empty());
         if (!this->perm) {
-            this->length = std::stoul(argumentMap.at(length.first));
+            this->lengthMin = std::stoul(argumentMap.at(lengthMin.first));
+            this->lengthMax = std::stoul(argumentMap.at(lengthMax.first));
+            this->length = this->lengthMin;
         }
         this->path = argumentMap.at(filePath.first);
         if (!path.empty()) {
@@ -298,7 +322,7 @@ bool Generator::parseArguments(int argc, char **args) {
 
 bool Generator::checkArguments() {
     if (perm && elementCount > 1) return true;
-    return length > 1 && elementCount > 1;
+    return lengthMin > 1 && elementCount > 1;
 }
 
 unsigned long Generator::getTotalN() const {
@@ -314,4 +338,15 @@ void Generator::addToQueue(std::string &str) {
 
 bool Generator::isFileMode() const {
     return fileMode;
+}
+
+void Generator::calculateTotalN() {
+    for (size_t lengthTemp = lengthMin; lengthTemp <= lengthMax; lengthTemp++) {
+        // Calculate total count of combinations
+        totalN += static_cast<unsigned long>(std::pow(characterSet.size(), lengthTemp));
+    }
+}
+
+size_t Generator::getN(size_t lengthTemp) {
+    return static_cast<unsigned long>(std::pow(characterSet.size(), lengthTemp));
 }

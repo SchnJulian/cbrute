@@ -70,12 +70,18 @@ private:
 
     // Number of possible permutations/combinations
     unsigned long totalN = 0;
-    size_t length = 0;
+    size_t lengthMin = 0;
+    size_t length;
+    size_t lengthMax = 0;
     size_t elementCount = 0;
     // Amount of memory required in bytes
     long double approxMemory = 0;
 
     void memoryApproximation();
+
+    void calculateN();
+
+    void calculateTotalN();
 
     std::vector<char> characterSet;
     std::ofstream fileStream;
@@ -94,6 +100,8 @@ private:
     void append(std::string &str);
 
     void prepend(std::string &str);
+
+    size_t getN(size_t temp);
 };
 
 

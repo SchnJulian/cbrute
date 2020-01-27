@@ -6,17 +6,11 @@
 
 #IncludeRegexTransform: 
 
-/Users/Julian/Documents/GitHub/cbrute/cbrute/Generator.cpp
-cmath
--
-iostream
--
-map
--
+/Users/julian/Documents/GitHub/cbrute/cbrute/Generator.cpp
 Generator.h
-/Users/Julian/Documents/GitHub/cbrute/cbrute/Generator.h
+/Users/julian/Documents/GitHub/cbrute/cbrute/Generator.h
 
-/Users/Julian/Documents/GitHub/cbrute/cbrute/Generator.h
+/Users/julian/Documents/GitHub/cbrute/cbrute/Generator.h
 cstdlib
 -
 string
@@ -24,5 +18,17 @@ string
 vector
 -
 fstream
+-
+cmath
+-
+iostream
+-
+queue
+-
+map
+-
+algorithm
+-
+thread
 -
 

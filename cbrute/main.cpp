@@ -18,7 +18,8 @@ OPTIONS:
     -log                    Print results to the console
 
 ARGUMENTS:
-    -l <value>              Length of the combination
+    -lmin <value>           Minimum length of the combination
+    -lmax <value
     -c <values>             Character-set
     -f <path>               Path for output file with the combinations
     -perm                   No repetitions
