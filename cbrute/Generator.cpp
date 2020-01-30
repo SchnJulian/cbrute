@@ -13,6 +13,9 @@ Generator::~Generator() {
 }
 
 Generator::Generator(int argc, char **args) {
+//    threadCount = std::thread::hardware_concurrency() - 1;
+    threadCount = 14;
+    threadTasks = std::vector<std::vector<std::tuple<unsigned long, unsigned long, unsigned long>>>(threadCount);
     if (parseArguments(argc, args)) {
         if (checkArguments()) {
             initTasks();
@@ -21,18 +24,15 @@ Generator::Generator(int argc, char **args) {
     }
 }
 
-void Generator::calculateN() {
-    if (this->perm) {
-        this->totalN = factorial(this->elementCount);
-    } else {
-        this->totalN = static_cast<unsigned long>(std::pow(this->elementCount, this->length));
-    }
-}
+void Generator::getCombinationsMT(std::vector<std::tuple<unsigned long, unsigned long, unsigned long>> tasksMT) {
 
-void Generator::getCombinations(unsigned long start, unsigned long end) {
-    // TODO: For loop for different length-combinations
-    for (size_t length = lengthMin; length <= lengthMax; length++) {
-        // Fill with dummy elements
+    for(auto &item : tasksMT){
+
+        auto start = std::get<0>(item);
+        auto end = std::get<1>(item);
+        auto length = std::get<2>(item);
+
+        // Fil with dummy elements
         std::string comb(length, ' ');
         std::string temp(length, ' ');
 
@@ -46,6 +46,24 @@ void Generator::getCombinations(unsigned long start, unsigned long end) {
             for (auto f : tasks) (this->*f)(temp);
         }
     }
+}
+
+
+
+void Generator::getCombinations(unsigned long start, unsigned long end, unsigned long length) {
+        // Fil with dummy elements
+        std::string comb(length, ' ');
+        std::string temp(length, ' ');
+
+        for (auto i = start; i < end; ++i) {
+            auto n = i;
+            for (size_t j = 0; j < length; ++j) {
+                comb[comb.size() - j - 1] = characterSet[n % elementCount];
+                n /= elementCount;
+            }
+            temp = comb;
+            for (auto f : tasks) (this->*f)(temp);
+        }
 
 }
 
@@ -82,11 +100,14 @@ void Generator::prepend(std::string &str) {
 }
 
 void Generator::console() {
+    // FIXME: Console output currently not working due to print-queue issues
+    // Number of combinations to print
     unsigned long todo = totalN;
     while (todo > 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         std::queue<std::string> temp;
         { // Lock only taken for this section
+
             std::lock_guard<std::mutex> lock(m);
             std::swap(temp, printQueue);
         }
@@ -99,11 +120,13 @@ void Generator::console() {
 }
 
 void Generator::print() {
+    // Number of combinations to print
     unsigned long todo = totalN;
     while (todo > 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         std::queue<std::string> temp;
         { // Lock only taken for this section
+            // Lock this area to avoid adding and printing to/from the queue simultaneously
             std::lock_guard<std::mutex> lock(m);
             std::swap(temp, printQueue);
         }
@@ -119,21 +142,21 @@ void Generator::start() {
     if (perm) {
         getPermutations();
     } else {
+        initThreads();
 
-        if (lengthMin - lengthMax == 0) {
-            std::thread first(&Generator::getCombinations, this, 0, totalN);
-            first.join();
-        } else {
-            // FIXME Multithreading for different lengths
-            for (size_t lengthTemp = lengthMin; lengthTemp <= lengthMax; lengthTemp++) {
-                std::thread first(&Generator::getCombinations, this, 0, getN(lengthTemp));
-                first.join();
-            }
-        }
+        std::vector<std::thread> threads;
+//        FIXME only for debugging
+//        if (fileMode) {
+//        }
         std::thread second(&Generator::print, this);
-        if (fileMode) {
-            second.join();
+        for (unsigned long i = 0; i < threadCount; ++i){
+            std::thread t(&Generator::getCombinationsMT, this, threadTasks[i]);
+            threads.push_back(std::move(t));
         }
+        for(auto &elem : threads){
+            if(elem.joinable()) elem.join();
+        }
+        if(second.joinable()) second.join();
         if (log) {
             std::thread third(&Generator::console, this);
             third.join();
@@ -349,4 +372,46 @@ void Generator::calculateTotalN() {
 
 size_t Generator::getN(size_t lengthTemp) {
     return static_cast<unsigned long>(std::pow(characterSet.size(), lengthTemp));
+}
+
+bool Generator::initThreads() {
+    // v[] = tasklist for core
+    // v[][] = task
+
+
+
+    // NOTE: totalN has to be calculated for this step
+
+    auto combPerThread = totalN / threadCount;
+    auto todo = totalN;
+    auto lengthTemp = lengthMin;
+//    long long end = -1; // NOTE: for increment
+    long long end = 0;
+    for (int thread = 0; thread < threadCount; ++thread) {
+        long long start = 0;
+
+        unsigned long done = 0;
+
+        while (todo > 0 && lengthTemp <= lengthMax && done < combPerThread){
+//            start = end + 1;
+            start = end;
+            end = start + combPerThread;
+            if(end > getN(lengthTemp)) {
+                end = 0;
+                end += getN(lengthTemp);
+            }
+            auto e = std::make_tuple(start, end, lengthTemp);
+            threadTasks.at(thread).emplace_back(e);
+            done += end - start;
+            todo -= end - start;
+            if(end == getN(lengthTemp)){
+                lengthTemp++;
+                start = 0;
+                end = 0;
+            }
+        }
+    }
+
+
+    return false;
 }

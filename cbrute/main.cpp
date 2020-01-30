@@ -47,6 +47,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "-h") {
             helpmenu();

@@ -71,15 +71,13 @@ private:
     // Number of possible permutations/combinations
     unsigned long totalN = 0;
     size_t lengthMin = 0;
-    size_t length;
+    size_t length = 0;
     size_t lengthMax = 0;
     size_t elementCount = 0;
     // Amount of memory required in bytes
     long double approxMemory = 0;
 
     void memoryApproximation();
-
-    void calculateN();
 
     void calculateTotalN();
 
@@ -88,7 +86,7 @@ private:
     std::string path;
 
     // Generator functions
-    void getCombinations(unsigned long start, unsigned long end);
+    void getCombinations(unsigned long start, unsigned long end, unsigned long length);
 
     void getPermutations();
 
@@ -101,7 +99,16 @@ private:
 
     void prepend(std::string &str);
 
+    bool initThreads();
+
     size_t getN(size_t temp);
+
+
+    // Multithreading support
+
+    unsigned long threadCount;
+    std::vector<std::vector<std::tuple<unsigned long, unsigned long, unsigned long>>> threadTasks;
+    void getCombinationsMT(std::vector<std::tuple<unsigned long, unsigned long, unsigned long>> tasksMT);
 };
 
 
