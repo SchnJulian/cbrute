@@ -5,413 +5,476 @@
 #include "Generator.h"
 
 unsigned long long factorial(unsigned long long n) {
-    return (n == 1L || n == 0L) ? 1L : factorial(n - 1L) * n;
+  return (n == 1L || n == 0L) ? 1L : factorial(n - 1L) * n;
 }
 
+void swap(char **str1_ptr, char **str2_ptr) {
+  char *temp = *str1_ptr;
+  *str1_ptr = *str2_ptr;
+  *str2_ptr = temp;
+}
 Generator::~Generator() {
-    fileStream.close();
+  //    fileStream.close();
+  fclose(output_file);
 }
 
 Generator::Generator(int argc, char **args) {
-//    threadCount = std::thread::hardware_concurrency() - 1;
-    threadCount = 14;
-    threadTasks = std::vector<std::vector<std::tuple<unsigned long, unsigned long, unsigned long>>>(threadCount);
-    if (parseArguments(argc, args)) {
-        if (checkArguments()) {
-            initTasks();
-            calculateTotalN();
-        }
+  if (parse_arguments(argc, args)) {
+    if (check_arguments()) {
+      init_tasks();
+      calculate_total_N();
     }
+  }
 }
 
-void Generator::getCombinationsMT(std::vector<std::tuple<unsigned long, unsigned long, unsigned long>> tasksMT) {
+void Generator::init_thread_tasks(unsigned long n) {
+  thread_tasks = std::vector<
+      std::vector<std::tuple<unsigned long, unsigned long, unsigned long>>>(n);
+}
 
-    for(auto &item : tasksMT){
+void Generator::get_combinations_MT(
+    std::vector<std::tuple<unsigned long, unsigned long, unsigned long>>
+        tasks_MT,
+    unsigned long index) {
+  for (auto &item : tasks_MT) {
+    auto start = std::get<0>(item);
+    auto end = std::get<1>(item);
+    auto length = std::get<2>(item);
 
-        auto start = std::get<0>(item);
-        auto end = std::get<1>(item);
-        auto length = std::get<2>(item);
+    char comb[length];
 
-        // Fil with dummy elements
-        std::string comb(length, ' ');
-        std::string temp(length, ' ');
-
-        for (auto i = start; i < end; ++i) {
-            auto n = i;
-            for (size_t j = 0; j < length; ++j) {
-                comb[comb.size() - j - 1] = characterSet[n % elementCount];
-                n /= elementCount;
-            }
-            temp = comb;
-            for (auto f : tasks) (this->*f)(temp);
-        }
+    for (auto i = start; i < end; ++i) {
+      auto n = i;
+      for (unsigned long j = 0; j < length; ++j) {
+        comb[length - j - 1] = character_set[n % element_count];
+        n /= element_count;
+      }
+      add_to_temp(comb, index);
     }
+  }
 }
+void Generator::get_combinations_ST(unsigned long start, unsigned long end,
+                                    unsigned long length) {
+  // Fil with dummy elements
 
-
-
-void Generator::getCombinations(unsigned long start, unsigned long end, unsigned long length) {
-        // Fil with dummy elements
-        std::string comb(length, ' ');
-        std::string temp(length, ' ');
-
-        for (auto i = start; i < end; ++i) {
-            auto n = i;
-            for (size_t j = 0; j < length; ++j) {
-                comb[comb.size() - j - 1] = characterSet[n % elementCount];
-                n /= elementCount;
-            }
-            temp = comb;
-            for (auto f : tasks) (this->*f)(temp);
-        }
-
-}
-
-void Generator::getPermutations() {
-    std::string temp(lengthMin, ' ');
-    std::string perm(std::begin(characterSet), std::end(characterSet));
-    std::sort(std::begin(perm), std::end(perm));
-    do {
-        temp = perm;
-        for (auto f : tasks) (this->*f)(temp);
-    } while (std::next_permutation(std::begin(perm), std::end(perm)));
-}
-
-bool Generator::initTasks() {
-    if (!appendT.empty()) tasks.push_back(&Generator::append);
-    if (!prependT.empty()) tasks.push_back(&Generator::prepend);
-    return true;
-}
-
-bool Generator::initFileStream() {
-    if (!path.empty()) {
-        fileStream.open(path);
-        tasks.push_back(&Generator::addToQueue);
+  char *comb = (char *)malloc(length * sizeof(char));
+  char *temp = (char *)malloc(length * sizeof(char));
+  for (auto i = start; i < end; ++i) {
+    auto n = i;
+    for (unsigned long j = 0; j < length; ++j) {
+      comb[length - j - 1] = character_set[n % element_count];
+      n /= element_count;
     }
-    return fileStream.good();
+    swap(&temp, &comb);
+    temp = comb;
+    for (auto f : tasks)
+      (this->*f)(temp);
+  }
 }
 
-void Generator::append(std::string &str) {
-    str.append(appendT);
+void Generator::get_permutations() {
+  std::string temp(length_min, ' ');
+  std::string perm(std::begin(character_set), std::end(character_set));
+  std::sort(std::begin(perm), std::end(perm));
+  do {
+    temp = perm;
+    // for (auto f : tasks) (this->*f)(temp);
+  } while (std::next_permutation(std::begin(perm), std::end(perm)));
 }
 
-void Generator::prepend(std::string &str) {
-    str.insert(0, prependT);
+void Generator::init_tasks() {
+
+  if (append_str != NULL) {
+    tasks.push_back(&Generator::append);
+  }
+  if (prepend_str != NULL) {
+    tasks.push_back(&Generator::prepend);
+  }
+}
+
+bool Generator::init_file_stream() {
+  if (!path.empty()) {
+    //        fileStream.open(path);
+    output_file = fopen(path.c_str(), "w");
+  }
+  return fileStream.good();
+}
+
+void Generator::append(char *str) {
+  str = (char *)realloc(str, sizeof(str) + sizeof(append_str));
+  strcat(str, append_str);
+}
+
+void Generator::prepend(char *str) {
+  str = (char *)realloc(str, sizeof(str) + sizeof(prepend_str));
+  unsigned long len = strlen(prepend_str);
+  memmove(str + len, str, strlen(str) + 1);
+  memcpy(str, prepend_str, len);
 }
 
 void Generator::console() {
-    // FIXME: Console output currently not working due to print-queue issues
-    // Number of combinations to print
-    unsigned long todo = totalN;
-    while (todo > 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        std::queue<std::string> temp;
-        { // Lock only taken for this section
+  // FIXME: Console output currently not working due to print-queue issues
+  // Number of combinations to print
+  unsigned long todo = total_N;
+  while (todo > 0) {
+    //  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::queue<std::string> temp;
+    { // Lock only taken for this section
 
-            std::lock_guard<std::mutex> lock(m);
-            std::swap(temp, printQueue);
-        }
-        todo -= temp.size();
-        while (!temp.empty()) {
-            std::cout << temp.front() << '\n';
-            temp.pop();
-        }
+      std::lock_guard<std::mutex> lock(m);
+      std::swap(temp, print_queue);
     }
-}
-
-void Generator::print() {
-    // Number of combinations to print
-    unsigned long todo = totalN;
-    while (todo > 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        std::queue<std::string> temp;
-        { // Lock only taken for this section
-            // Lock this area to avoid adding and printing to/from the queue simultaneously
-            std::lock_guard<std::mutex> lock(m);
-            std::swap(temp, printQueue);
-        }
-        todo -= temp.size();
-        while (!temp.empty()) {
-            fileStream << temp.front() << '\n';
-            temp.pop();
-        }
+    todo -= temp.size();
+    while (!temp.empty()) {
+      std::cout << temp.front() << '\n';
+      temp.pop();
     }
+  }
 }
 
 void Generator::start() {
-    if (perm) {
-        getPermutations();
-    } else {
-        initThreads();
-
-        std::vector<std::thread> threads;
-//        FIXME only for debugging
-//        if (fileMode) {
-//        }
-        std::thread second(&Generator::print, this);
-        for (unsigned long i = 0; i < threadCount; ++i){
-            std::thread t(&Generator::getCombinationsMT, this, threadTasks[i]);
-            threads.push_back(std::move(t));
-        }
-        for(auto &elem : threads){
-            if(elem.joinable()) elem.join();
-        }
-        if(second.joinable()) second.join();
-        if (log) {
-            std::thread third(&Generator::console, this);
-            third.join();
-        }
+  // Start time
+  begin = std::chrono::high_resolution_clock::now();
+  todo = total_N;
+  if (perm) {
+    get_permutations();
+  } else {
+    init_threads();
+    std::vector<std::thread> threads;
+    //        FIXME only for debugging
+    //        if (fileMode) {
+    //        }
+    std::thread second(&Generator::print_MT, this);
+    // Running
+    for (unsigned long i = 0; i < thread_count; ++i) {
+      std::thread t(&Generator::get_combinations_MT, this, thread_tasks[i], i);
+      threads.push_back(std::move(t));
     }
+    for (auto &elem : threads) {
+      if (elem.joinable())
+        elem.join();
+    }
+    // Running end
+    running = false;
+    if (second.joinable())
+      second.join();
+    if (log) {
+      std::thread third(&Generator::console, this);
+      third.join();
+    }
+  }
+  end = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+
+  print_report(std::cout);
 }
 
-void Generator::memoryApproximation() {
-    if (perm) {
-        approxMemory = sizeof(char) *
-                       (elementCount + appendT.length() + prependT.length() +
-                        1) * totalN;
-    } else {
-        for (size_t lengthTemp = lengthMax; lengthTemp <= lengthMax; lengthTemp++) {
-            approxMemory += sizeof(char) *
-                            (lengthTemp + appendT.length() + prependT.length() + 1) * totalN;
-            // Calculate total count of combinations
-        }
+void Generator::approximate_memory() {
+  if (perm) {
+    approx_memory = sizeof(char) * (element_count) +
+                    (sizeof(append_str) + sizeof(prepend_str)) * total_N;
+  } else {
+    for (unsigned long length_temp = length_max; length_temp <= length_max;
+         length_temp++) {
+      approx_memory += (sizeof(char) * (length_temp) + sizeof(append_str) +
+                        sizeof(prepend_str)) *
+                       total_N;
+      // Calculate total count of combinations
     }
+  }
 }
 
-bool Generator::confirmMemory() {
-    // Approximate memory
-    memoryApproximation();
-    auto unit = "B";
-    auto divisor = 1L;
-    auto UD = std::make_pair(unit, divisor);
-    if (approxMemory >= 1000 && approxMemory < 1000000) {
-        UD.first = "KB";
-        UD.second = 1000;
-    } else if (approxMemory >= 1000000 && approxMemory < 1000000000) {
-        UD.first = "MB";
-        UD.second = 1000000;
-    } else if (approxMemory >= 1000000000 && approxMemory < 1000000000000) {
-        UD.first = "GB";
-        UD.second = 1000000000;
-    } else if (approxMemory >= 1000000000000) {
-        UD.first = "TB";
-        UD.second = 1000000000000;
-    }
-    std::cout
-            << "CBRUTE will generate a "
-            << approxMemory / UD.second
-            << UD.first << " text file" << "\n"
+bool Generator::confirm_memory() {
+  // Approximate memory
+  approximate_memory();
+  auto UD = get_unit(approx_memory);
+  std::cout << "CBRUTE will generate a " << approx_memory / UD.second
+            << UD.first << " text file"
+            << "\n"
             << "Are you sure you want to continue? [y/n] : ";
 
-    char input;
-    std::cin >> input;
-    if (tolower(input) == 'y') {
-        return initFileStream();
-    }
-    return false;
+  char input;
+  std::cin >> input;
+  if (tolower(input) == 'y') {
+    return init_file_stream();
+  }
+  return false;
 }
 
-bool Generator::parseArguments(int argc, char **args) {
-    std::map<std::string, std::string> argumentMap;
-    auto lengthMin = std::make_pair("-lmin", "");
-    auto lengthMax = std::make_pair("-lmax", "");
-    auto characters = std::make_pair("-c", "");
-    auto filePath = std::make_pair("-f", "");
-    auto perm = std::make_pair("-perm", "");
-    auto log = std::make_pair("-log", "");
-    auto alphabetic = std::make_pair("-alphabetic", "");
-    auto digit = std::make_pair("-digit", "");
-    auto special = std::make_pair("-special", "");
-    auto ascii = std::make_pair("-ascii", "");
-    auto exclude = std::make_pair("-x", "");
-    auto prepend = std::make_pair("-prepend", "");
-    auto append = std::make_pair("-append", "");
+bool Generator::parse_arguments(int argc, char **args) {
+  std::map<std::string, std::string> argument_map;
+  auto lengthMin = std::make_pair("-lmin", "");
+  auto lengthMax = std::make_pair("-lmax", "");
+  auto characters = std::make_pair("-c", "");
+  auto filePath = std::make_pair("-f", "");
+  auto perm = std::make_pair("-perm", "");
+  auto log = std::make_pair("-log", "");
+  auto alphabetic = std::make_pair("-alphabetic", "");
+  auto digit = std::make_pair("-digit", "");
+  auto special = std::make_pair("-special", "");
+  auto ascii = std::make_pair("-ascii", "");
+  auto exclude = std::make_pair("-x", "");
+  auto prepend = std::make_pair("-prepend", "");
+  auto append = std::make_pair("-append", "");
+  auto threads = std::make_pair("-threads", "");
 
-    argumentMap.insert(lengthMin);
-    argumentMap.insert(lengthMax);
-    argumentMap.insert(characters);
-    argumentMap.insert(filePath);
-    argumentMap.insert(perm);
-    argumentMap.insert(log);
-    argumentMap.insert(alphabetic);
-    argumentMap.insert(digit);
-    argumentMap.insert(special);
-    argumentMap.insert(ascii);
-    argumentMap.insert(exclude);
-    argumentMap.insert(prepend);
-    argumentMap.insert(append);
+  argument_map.insert(lengthMin);
+  argument_map.insert(lengthMax);
+  argument_map.insert(characters);
+  argument_map.insert(filePath);
+  argument_map.insert(perm);
+  argument_map.insert(log);
+  argument_map.insert(alphabetic);
+  argument_map.insert(digit);
+  argument_map.insert(special);
+  argument_map.insert(ascii);
+  argument_map.insert(exclude);
+  argument_map.insert(prepend);
+  argument_map.insert(append);
+  argument_map.insert(threads);
 
-    // Iterate through arg string
-    for (int i = 1; i < argc - 1; ++i) {
-        if (argumentMap.find(args[i]) != std::end(argumentMap)) {
-            argumentMap.find(args[i])->second = args[i + 1];
-        }
+  // Iterate through arg string
+  for (int i = 1; i < argc - 1; ++i) {
+    if (argument_map.find(args[i]) != std::end(argument_map)) {
+      argument_map.find(args[i])->second = args[i + 1];
     }
-    // Check last argument
-    if (argumentMap.find(args[argc - 1]) != std::end(argumentMap))
-        argumentMap.find(args[argc - 1])->second = "1";
+  }
+  // Check last argument
+  if (argument_map.find(args[argc - 1]) != std::end(argument_map))
+    argument_map.find(args[argc - 1])->second = "1";
 
-    try {
-        this->perm = !(argumentMap.at(perm.first).empty());
-        if (!this->perm) {
-            this->lengthMin = std::stoul(argumentMap.at(lengthMin.first));
-            this->lengthMax = std::stoul(argumentMap.at(lengthMax.first));
-            this->length = this->lengthMin;
-        }
-        this->path = argumentMap.at(filePath.first);
-        if (!path.empty()) {
-            fileMode = true;
-            if (path.find(defaultFileExtension) == std::string::npos) {
-                // Add missing file extension
-                path.append(defaultFileExtension);
-            }
-        }
-        this->log = !(argumentMap.at(log.first).empty());
-    } catch (std::invalid_argument &e) {
-        return false;
+  try {
+    this->perm = !(argument_map.at(perm.first).empty());
+    if (!this->perm) {
+      this->length_min = std::stoul(argument_map.at(lengthMin.first));
+      this->length_max = std::stoul(argument_map.at(lengthMax.first));
     }
+    this->path = argument_map.at(filePath.first);
+    if (!path.empty()) {
+      file_mode = true;
+      if (path.find(DEFAULT_FILE_EXTENSION) == std::string::npos) {
+        // Add missing file extension
+        path.append(DEFAULT_FILE_EXTENSION);
+      }
+    }
+    this->log = !(argument_map.at(log.first).empty());
+  } catch (std::invalid_argument &e) {
+    return false;
+  }
 
-    // String to appendT to
-    if (!(argumentMap.at(append.first).empty()))
-        std::copy(std::begin(argumentMap.at(append.first)),
-                  std::end(argumentMap.at(append.first)),
-                  std::back_inserter(this->appendT));
+  // String to prepend before
+  if (!(argument_map.at(prepend.first).empty())) {
+    prepend_str = static_cast<char *>(
+        malloc(argument_map.at(append.first).size() * sizeof(char)));
+    strcpy(prepend_str, argument_map.at(prepend.first).c_str());
+  }
 
-    // String to prepend before
-    if (!(argumentMap.at(prepend.first).empty()))
-        std::copy(std::begin(argumentMap.at((prepend.first))),
-                  std::end(argumentMap.at((prepend.first))),
-                  std::back_inserter(this->prependT));
+  // String to append to
+  if (!(argument_map.at(append.first).empty())) {
+    append_str = static_cast<char *>(
+        malloc(argument_map.at(append.first).size() * sizeof(char)));
+    strcpy(append_str, argument_map.at(append.first).c_str());
+  }
 
-    // Check if full ascii set was activated
-    if (!(argumentMap.at(ascii.first).empty())) {
-        std::copy(std::begin(this->ascii), std::end(this->ascii),
-                  std::back_inserter(this->characterSet));
-    } else {
-        // Initialize alphabetic character set
-        if (argumentMap.at(alphabetic.first) == "u") {
-            std::copy(std::begin(this->alphaU), std::end(this->alphaU),
-                      std::back_inserter(this->characterSet));
-        } else if (argumentMap.at(alphabetic.first) == "l") {
-            std::copy(std::begin(this->alphaL), std::end(this->alphaL),
-                      std::back_inserter(this->characterSet));
-        } else if (!(argumentMap.at(alphabetic.first).empty())) {
-            std::copy(std::begin(this->alphaU), std::end(this->alphaU),
-                      std::back_inserter(this->characterSet));
-            std::copy(std::begin(this->alphaL), std::end(this->alphaL),
-                      std::back_inserter(this->characterSet));
-        }
+  // Manual thread count override
+  if (!(argument_map.at(threads.first).empty())) {
+    manual_thread_count =
+        std::stoul(argument_map.at(threads.first), nullptr, 0);
+    manual_thread_override = true;
+  }
 
-        // Initialize numeric character set
-        if (!(argumentMap.at(digit.first).empty()))
-            std::copy(std::begin(this->digit), std::end(this->digit),
-                      std::back_inserter(this->characterSet));
-
-        // Initialize special character set
-        if (!(argumentMap.at(special.first).empty()))
-            std::copy(std::begin(this->special), std::end(this->special),
-                      std::back_inserter(this->characterSet));
-
-        // Initialize character set
-        std::string temp = argumentMap.at(characters.first);
-        std::copy(std::begin(temp), std::end(temp),
-                  std::back_inserter(this->characterSet));
-
-        std::vector<char> tempX(std::begin(argumentMap.at(exclude.first)),
-                                std::end(argumentMap.at(exclude.first)));
-        std::sort(std::begin(tempX), std::end(tempX));
-        std::sort(std::begin(this->characterSet), std::end(this->characterSet));
-        if (!(argumentMap.at(exclude.first).empty())) {
-            this->characterSet.erase(
-                    std::remove_if(std::begin(this->characterSet),
-                                   std::end(this->characterSet),
-                                   [&tempX](char c) {
-                                       return std::binary_search(
-                                               std::begin(tempX),
-                                               std::end(tempX), c);
-                                   }), std::end(this->characterSet));
-
-        }
+  // Check if full ascii set was activated
+  if (!(argument_map.at(ascii.first).empty())) {
+    std::copy(std::begin(this->ascii), std::end(this->ascii),
+              std::back_inserter(this->character_set));
+  } else {
+    // Initialize alphabetic character set
+    if (argument_map.at(alphabetic.first) == "u") {
+      std::copy(std::begin(this->alpha_upper), std::end(this->alpha_upper),
+                std::back_inserter(this->character_set));
+    } else if (argument_map.at(alphabetic.first) == "l") {
+      std::copy(std::begin(this->alpha_lower), std::end(this->alpha_lower),
+                std::back_inserter(this->character_set));
+    } else if (!(argument_map.at(alphabetic.first).empty())) {
+      std::copy(std::begin(this->alpha_upper), std::end(this->alpha_upper),
+                std::back_inserter(this->character_set));
+      std::copy(std::begin(this->alpha_lower), std::end(this->alpha_lower),
+                std::back_inserter(this->character_set));
     }
 
-    // Remove duplicates
-    this->characterSet.erase(
-            std::unique(std::begin(this->characterSet),
-                        std::end(this->characterSet)),
-            std::end(this->characterSet));
-    this->elementCount = characterSet.size();
+    // Initialize numeric character set
+    if (!(argument_map.at(digit.first).empty()))
+      std::copy(std::begin(this->digit), std::end(this->digit),
+                std::back_inserter(this->character_set));
+
+    // Initialize special character set
+    if (!(argument_map.at(special.first).empty()))
+      std::copy(std::begin(this->special), std::end(this->special),
+                std::back_inserter(this->character_set));
+
+    // Initialize character set
+    std::string temp = argument_map.at(characters.first);
+    std::copy(std::begin(temp), std::end(temp),
+              std::back_inserter(this->character_set));
+
+    std::vector<char> tempX(std::begin(argument_map.at(exclude.first)),
+                            std::end(argument_map.at(exclude.first)));
+    std::sort(std::begin(tempX), std::end(tempX));
+    std::sort(std::begin(this->character_set), std::end(this->character_set));
+    if (!(argument_map.at(exclude.first).empty())) {
+      this->character_set.erase(std::remove_if(std::begin(this->character_set),
+                                               std::end(this->character_set),
+                                               [&tempX](char c) {
+                                                 return std::binary_search(
+                                                     std::begin(tempX),
+                                                     std::end(tempX), c);
+                                               }),
+                                std::end(this->character_set));
+    }
+  }
+
+  // Remove duplicates
+  this->character_set.erase(std::unique(std::begin(this->character_set),
+                                        std::end(this->character_set)),
+                            std::end(this->character_set));
+  this->element_count = character_set.size();
+  return true;
+}
+
+bool Generator::check_arguments() {
+  if (perm && element_count > 1)
     return true;
+  return length_min > 1 && element_count > 1;
 }
 
-bool Generator::checkArguments() {
-    if (perm && elementCount > 1) return true;
-    return lengthMin > 1 && elementCount > 1;
+bool Generator::is_file_mode() const { return file_mode; }
+
+void Generator::calculate_total_N() {
+  for (unsigned long length_temp = length_min; length_temp <= length_max;
+       length_temp++) {
+    // Calculate total count of combinations
+    total_N +=
+        static_cast<unsigned long>(std::pow(character_set.size(), length_temp));
+  }
 }
 
-unsigned long Generator::getTotalN() const {
-    return totalN;
+unsigned long Generator::get_N(unsigned long temp) {
+  return static_cast<unsigned long>(std::pow(character_set.size(), temp));
 }
 
-void Generator::addToQueue(std::string &str) {
-    {
+bool Generator::init_threads() {
+  // v[] = tasklist for core
+  // v[][] = task
+
+  if (manual_thread_override) {
+    this->thread_count = manual_thread_count;
+    init_thread_tasks(thread_count);
+  } else {
+    this->thread_count = std::thread::hardware_concurrency() - 2;
+    init_thread_tasks(thread_count);
+  }
+  auto combPerThread = total_N / thread_count;
+  auto todo = total_N;
+  auto lengthTemp = length_min;
+  long long end = 0;
+  for (int thread = 0; thread < thread_count; ++thread) {
+    long long start = 0;
+    unsigned long done = 0;
+    while (todo > 0 && lengthTemp <= length_max && done < combPerThread) {
+      start = end;
+      end = start + combPerThread;
+      if (end > get_N(lengthTemp)) {
+        end = 0;
+        end += get_N(lengthTemp);
+      }
+      auto e = std::make_tuple(start, end, lengthTemp);
+      thread_tasks.at(thread).emplace_back(e);
+      done += end - start;
+      todo -= end - start;
+      if (end == get_N(lengthTemp)) {
+        lengthTemp++;
+        start = 0;
+        end = 0;
+      }
+    }
+  }
+  // Init different queues
+  temp_comb = std::vector<std::queue<const char *>>(thread_count);
+  return false;
+}
+
+void Generator::add_to_temp(const char *temp, unsigned long index) {
+  char *t = static_cast<char *>(malloc(sizeof(temp)));
+  strcpy(t, temp);
+  temp_comb.at(index).push(t);
+}
+
+void Generator::print_MT() {
+  while (todo > 0) {
+    if (running) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      std::vector<std::queue<const char *>> temp(thread_count);
+      { // Lock only taken for this section
+        // Lock this area to avoid adding and printing to/from the queue
+        // simultaneously
         std::lock_guard<std::mutex> lock(m);
-        printQueue.push(str);
-    }
-}
-
-bool Generator::isFileMode() const {
-    return fileMode;
-}
-
-void Generator::calculateTotalN() {
-    for (size_t lengthTemp = lengthMin; lengthTemp <= lengthMax; lengthTemp++) {
-        // Calculate total count of combinations
-        totalN += static_cast<unsigned long>(std::pow(characterSet.size(), lengthTemp));
-    }
-}
-
-size_t Generator::getN(size_t lengthTemp) {
-    return static_cast<unsigned long>(std::pow(characterSet.size(), lengthTemp));
-}
-
-bool Generator::initThreads() {
-    // v[] = tasklist for core
-    // v[][] = task
-
-
-
-    // NOTE: totalN has to be calculated for this step
-
-    auto combPerThread = totalN / threadCount;
-    auto todo = totalN;
-    auto lengthTemp = lengthMin;
-//    long long end = -1; // NOTE: for increment
-    long long end = 0;
-    for (int thread = 0; thread < threadCount; ++thread) {
-        long long start = 0;
-
-        unsigned long done = 0;
-
-        while (todo > 0 && lengthTemp <= lengthMax && done < combPerThread){
-//            start = end + 1;
-            start = end;
-            end = start + combPerThread;
-            if(end > getN(lengthTemp)) {
-                end = 0;
-                end += getN(lengthTemp);
-            }
-            auto e = std::make_tuple(start, end, lengthTemp);
-            threadTasks.at(thread).emplace_back(e);
-            done += end - start;
-            todo -= end - start;
-            if(end == getN(lengthTemp)){
-                lengthTemp++;
-                start = 0;
-                end = 0;
-            }
+        temp_comb.swap(temp);
+      }
+      for (int i = 0; i < thread_count; ++i) {
+        while (!temp[i].empty()) {
+          auto t = temp[i].front();
+          // FIXME append / preprend support for const char pointers
+          for (auto f : tasks)
+            (this->*f)(const_cast<char *>(t));
+          fprintf(output_file, "%s\n", temp[i].front());
+          temp[i].pop();
+          todo--;
         }
+      }
+    } else {
+      for (int i = 0; i < thread_count; ++i) {
+        while (!temp_comb[i].empty()) {
+          fprintf(output_file, "%s\n", temp_comb[i].front());
+          temp_comb[i].pop();
+          todo--;
+        }
+      }
     }
+  }
+}
 
+void Generator::print_report(std::ostream &os) {
+  auto UD = get_unit(approx_memory);
+  os << "\n---\n"
+     << total_N << " "
+     << "Combinations generated in " << duration.count() << " milliseconds."
+     << std::endl
+     << "Total disk usage: " << approx_memory / UD.second << " " << UD.first
+     << std::endl
+     << "Threads used: " << thread_count << std::endl
+     << "Manual thread-count override: " << manual_thread_override << std::endl;
+}
 
-    return false;
+void Generator::print_ST(char *str) {
+  fprintf(output_file, "%s\n", str);
+  todo--;
+}
+
+std::pair<std::string, unsigned long> Generator::get_unit(unsigned long bytes) {
+  std::string unit = "B";
+  auto divisor = 1L;
+  if (approx_memory >= 1000 && approx_memory < 1000000) {
+    unit = "KB ";
+    divisor = 1000;
+  } else if (approx_memory >= 1000000 && approx_memory < 1000000000) {
+    unit = "MB";
+    divisor = 1000000;
+  } else if (approx_memory >= 1000000000 && approx_memory < 1000000000000) {
+    unit = "GB";
+    divisor = 1000000000;
+  } else if (approx_memory >= 1000000000000) {
+    unit = "TB";
+    divisor = 1000000000000;
+  }
+  return std::make_pair(unit, divisor);
 }

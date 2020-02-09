@@ -4,7 +4,7 @@
 
 void helpmenu() {
     std::string help =
-            R"(
+      R"(
 
 ### CBRUTE 0.1 ###
 
@@ -35,7 +35,9 @@ ARGUMENTS:
     -special                Add special characters to the character-set
     -x <values>             Excluded characters
     -prepend <value>        Prepend <string>
-    -appendT <value>        Append <string>
+    -append <value>        Append <string>
+    -threads <value>        Manual thread override: Calculate combinations with the amount of threads specified by
+                            the user. (Not recommended by default!)
     )";
     std::cout << help << std::endl;
 }
@@ -57,19 +59,14 @@ int main(int argc, char *argv[]) {
 
     auto generator = Generator(argc, argv);
     try {
-        // Abort option
-        if (generator.isFileMode()) {
-            if (!generator.confirmMemory()) {
-                throw std::invalid_argument("AbortedByUser");
-            }
+      // Abort option
+      if (generator.is_file_mode()) {
+        if (!generator.confirm_memory()) {
+          throw std::invalid_argument("AbortedByUser");
         }
-        auto start = std::chrono::high_resolution_clock::now();
-        generator.start();
-        auto stop = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                stop - start);
-        std::cout << generator.getTotalN() << " combinations generated in "
-                  << duration.count() << " ms" << std::endl;
+      }
+
+      generator.start();
 
     } catch (const std::exception &exc) {
         std::cerr << "Looks like something went wrong. See -h for help."
