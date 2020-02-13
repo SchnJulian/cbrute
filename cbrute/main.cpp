@@ -68,7 +68,7 @@ $$ |      $$ |  $$ |$$ |      $$ |  $$ |  $$ |$$\ $$   ____|
 
 bool disclaimer(){
     std::string disclaimer =
-            R"(
+      R"(
 Any actions and or activities related to the material contained within this program is solely your responsibility.
 The misuse of the information in this website can result in criminal charges brought against the persons in question.
 The author will not be held responsible in the event any criminal charges be brought against any individuals misusing cbrute to break the law.
@@ -80,22 +80,26 @@ The author will not be held responsible in the event any criminal charges be bro
 3. I reserve the right to modify the disclaimer at any time without notice.
 
 )";
-    std::cout << "\n\n\n" << disclaimer << "I have read and agree to the terms and conditions: [y/n]: ";
-    char input;
-    std::cin >> input;
-    return (tolower(input) == 'y');
+  std::cout << "\n\n\n"
+            << disclaimer
+            << "I have read and agree to the terms and conditions: [y/n]: ";
+  char input;
+  std::cin >> input;
+  return (tolower(input) == 'y');
 }
+
+// Direct-file experimental
 
 int main(int argc, char *argv[]) {
 
-    logo();
+  logo();
 
-    if (argc < 2) {
-        std::cerr << "Not enough arguments. See -h for help." << std::endl;
-        return 1;
-    }
+  if (argc < 2) {
+    std::cerr << "Not enough arguments. See -h for help." << std::endl;
+    return 1;
+  }
 
-    // Legal disclaimer
+  // Legal disclaimer
     if(!disclaimer()){
         return 1;
     }
