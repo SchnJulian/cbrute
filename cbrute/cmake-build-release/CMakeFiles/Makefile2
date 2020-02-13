@@ -47,7 +47,7 @@ EQUALS = =
 CMAKE_SOURCE_DIR = /Users/julian/Documents/Workspace/GitHub/cbrute/cbrute
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/cmake-build-debug
+CMAKE_BINARY_DIR = /Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/cmake-build-release
 
 #=============================================================================
 # Directory level rules for the build root directory
@@ -74,14 +74,14 @@ preinstall:
 CMakeFiles/cbrute.dir/all:
 	$(MAKE) -f CMakeFiles/cbrute.dir/build.make CMakeFiles/cbrute.dir/depend
 	$(MAKE) -f CMakeFiles/cbrute.dir/build.make CMakeFiles/cbrute.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/cmake-build-debug/CMakeFiles --progress-num=1,2,3 "Built target cbrute"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/cmake-build-release/CMakeFiles --progress-num=1,2,3 "Built target cbrute"
 .PHONY : CMakeFiles/cbrute.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/cbrute.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/cmake-build-debug/CMakeFiles 3
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/cmake-build-release/CMakeFiles 3
 	$(MAKE) -f CMakeFiles/Makefile2 CMakeFiles/cbrute.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/cmake-build-debug/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/cmake-build-release/CMakeFiles 0
 .PHONY : CMakeFiles/cbrute.dir/rule
 
 # Convenience name for target.

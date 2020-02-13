@@ -6,6 +6,10 @@
 
 #IncludeRegexTransform: 
 
+/Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/Generator.cpp
+Generator.h
+/Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/Generator.h
+
 /Users/julian/Documents/Workspace/GitHub/cbrute/cbrute/Generator.h
 cstdlib
 -

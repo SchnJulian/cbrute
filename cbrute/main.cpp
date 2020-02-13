@@ -1,8 +1,17 @@
 #include <iostream>
-#include <chrono>
 #include "Generator.h"
 
-void helpmenu() {
+void clear(){
+#if defined _WIN32
+    system("cls");
+#elif defined (__LINUX__) || defined(__gnu_linux__) || defined(__linux__)
+    system("clear");
+#elif defined (__APPLE__)
+    system("clear");
+#endif
+}
+
+void help_menu() {
     std::string help =
       R"(
 
@@ -42,17 +51,59 @@ ARGUMENTS:
     std::cout << help << std::endl;
 }
 
+void logo(){
+    std::string logo =
+            R"(
+          $$\                             $$\
+          $$ |                            $$ |
+ $$$$$$$\ $$$$$$$\   $$$$$$\  $$\   $$\ $$$$$$\    $$$$$$\
+$$  _____|$$  __$$\ $$  __$$\ $$ |  $$ |\_$$  _|  $$  __$$\
+$$ /      $$ |  $$ |$$ |  \__|$$ |  $$ |  $$ |    $$$$$$$$ |
+$$ |      $$ |  $$ |$$ |      $$ |  $$ |  $$ |$$\ $$   ____|
+\$$$$$$$\ $$$$$$$  |$$ |      \$$$$$$  |  \$$$$  |\$$$$$$$\
+ \_______|\_______/ \__|       \______/    \____/  \_______|
+)";
+    std::cout  << "\n\n\n" << logo << "\n\n\n";
+}
+
+bool disclaimer(){
+    std::string disclaimer =
+            R"(
+Any actions and or activities related to the material contained within this program is solely your responsibility.
+The misuse of the information in this website can result in criminal charges brought against the persons in question.
+The author will not be held responsible in the event any criminal charges be brought against any individuals misusing cbrute to break the law.
+
+**Your usage of cbrute constitutes your agreement to the following terms.**
+
+1. All the information provided on this site are for **educational purposes only**. cbrute's developer is no not responsible for any misuse of the information.
+2. cbrute is a program related to **Computer Security** and not a tool that promotes hacking / cracking.
+3. I reserve the right to modify the disclaimer at any time without notice.
+
+)";
+    std::cout << "\n\n\n" << disclaimer << "I have read and agree to the terms and conditions: [y/n]: ";
+    char input;
+    std::cin >> input;
+    return (tolower(input) == 'y');
+}
+
 int main(int argc, char *argv[]) {
+
+    logo();
 
     if (argc < 2) {
         std::cerr << "Not enough arguments. See -h for help." << std::endl;
         return 1;
     }
 
+    // Legal disclaimer
+    if(!disclaimer()){
+        return 1;
+    }
+    clear();
 
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "-h") {
-            helpmenu();
+          help_menu();
             return 0;
         }
     }
