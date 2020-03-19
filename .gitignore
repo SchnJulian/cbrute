@@ -33,3 +33,6 @@
 *.txt
 *.cmake
 *.c
+
+
+vscode/
